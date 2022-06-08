@@ -9,8 +9,8 @@
 #include <termios.h>
 #include <unistd.h>
 
-
 /*** defines ***/
+
 #define LEXI_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k)&0x1f)
 enum editorKey
@@ -30,7 +30,7 @@ enum editorKey
 
 struct editorConfig
 {
-  int cx, cy; // cursor x and y
+  int cursor_x, cursor_y; // cursor x and y
   int screenrows;
   int screencols;
   struct termios orig_termios;
@@ -38,20 +38,21 @@ struct editorConfig
 struct editorConfig E;
 
 /*** terminal ***/
+
 // Terminal starts in canonical mode by default (Input sent only when enter is pressed)
 // For a text editor, raw mode is used to allow input to be sent when any key is pressed
 
 void die(const char *s)
 {
-  write(STDOUT_FILENO, "\x1b[2J", 4);
-  write(STDOUT_FILENO, "\x1b[H", 3);
-  perror(s); // print error message based on global errno
+  write(STDOUT_FILENO, "\x1b[2J", 4); // erase entire screen
+  write(STDOUT_FILENO, "\x1b[H", 3);  // move cursor to 0,0
+  perror(s);                          // print error message based on global errno
   exit(1);
 }
 
 void disableRawMode()
 {
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) // tcgetattr() for setting terminal attributes
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) // tcsetattr() for setting terminal attributes
     die("tcsetattr");
 }
 
@@ -59,7 +60,7 @@ void enableRawMode()
 {
   if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1)
     die("tcgetattr");
-  atexit(disableRawMode);
+  atexit(disableRawMode); // call function when program is terminated , comes from <stdlib.h>
 
   struct termios raw = E.orig_termios;                      // copy of original terminal state stored in orig_termios
   raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); // disable all input processing  (input flags)
@@ -72,7 +73,7 @@ void enableRawMode()
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
     die("tcsetattr");
 }
-int editorReadKey()
+int editorReadKey() // read key from terminal
 {
   int nread;
   char c;
@@ -169,8 +170,8 @@ int getCursorPosition(int *rows, int *cols)
   buf[i] = '\0'; // add null character
   if (buf[0] != '\x1b' || buf[1] != '[')
     return -1;
-  if (sscanf(&buf[2], "%d;%d", rows, cols) != 2)
-    return -1; // comes from <stdio.h>,passing it the string to put the values into the rows and cols variables
+  if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) // reads data from buffer into required location
+    return -1;                                   // comes from <stdio.h>,passing it the string to put the values into the rows and cols variables
 
   return 0;
 }
@@ -193,17 +194,18 @@ int getWindowSize(int *rows, int *cols)
 }
 
 /*** append buffer ***/
-struct abuf
+
+struct append_buffer
 { // acts as a dynamic string
   char *b;
   int len;
 };
-#define ABUF_INIT \
-  {               \
-    NULL, 0       \
+#define append_buffer_INIT \
+  {                        \
+    NULL, 0                \
   } // acts as an empty buffer
 
-void abAppend(struct abuf *ab, const char *s, int len)
+void abAppend(struct append_buffer *ab, const char *s, int len)
 {
   char *new = realloc(ab->b, ab->len + len);
   if (new == NULL)
@@ -212,13 +214,14 @@ void abAppend(struct abuf *ab, const char *s, int len)
   ab->b = new;
   ab->len += len;
 }
-void abFree(struct abuf *ab)
-{ // de-allocates memory used by abuf
+void abFree(struct append_buffer *ab)
+{ // de-allocates memory used by append_buffer
   free(ab->b);
 }
 
 /*** output ***/
-void editorDrawRows(struct abuf *ab)
+
+void editorDrawRows(struct append_buffer *ab)
 { // handle drawing each row of text being edited
   int y;
   for (y = 0; y < E.screenrows; y++)
@@ -226,8 +229,7 @@ void editorDrawRows(struct abuf *ab)
     if (y == E.screenrows / 3)
     {
       char welcome[80];
-      int welcomelen = snprintf(welcome, sizeof(welcome), // comes from <stdio.h>
-                                "Lexi editor -- version %s", LEXI_VERSION);
+      int welcomelen = snprintf(welcome, sizeof(welcome), "Lexi editor -- version %s", LEXI_VERSION); // comes from <stdio.h>
       if (welcomelen > E.screencols)
         welcomelen = E.screencols;
       int padding = (E.screencols - welcomelen) / 2; // center the text
@@ -253,44 +255,45 @@ void editorDrawRows(struct abuf *ab)
 }
 void editorRefreshScreen()
 {
-  struct abuf ab = ABUF_INIT;
+  struct append_buffer ab = append_buffer_INIT;
   abAppend(&ab, "\x1b[?25l", 6); // hide cursor
   abAppend(&ab, "\x1b[H", 3);
   editorDrawRows(&ab);
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cursor_y + 1, E.cursor_x + 1);
   abAppend(&ab, buf, strlen(buf));
   abAppend(&ab, "\x1b[?25h", 6);      // show cursor
   write(STDOUT_FILENO, ab.b, ab.len); // write() and STDOUT_FILENO come from <unistd.h>
   abFree(&ab);
 }
 /*** input ***/
+
 void editorMoveCursor(int key)
 {
   switch (key)
   {
   case ARROW_LEFT:
-    if (E.cx != 0)
+    if (E.cursor_x != 0)
     {
-      E.cx--;
+      E.cursor_x--;
     }
     break;
   case ARROW_RIGHT:
-    if (E.cx != E.screencols - 1)
+    if (E.cursor_x != E.screencols - 1)
     {
-      E.cx++;
+      E.cursor_x++;
     }
     break;
   case ARROW_UP:
-    if (E.cy != 0)
+    if (E.cursor_y != 0)
     {
-      E.cy--;
+      E.cursor_y--;
     }
     break;
   case ARROW_DOWN:
-    if (E.cy != E.screenrows - 1)
+    if (E.cursor_y != E.screenrows - 1)
     {
-      E.cy++;
+      E.cursor_y++;
     }
     break;
   }
@@ -306,10 +309,10 @@ void editorProcessKeypress() // to wait for a keypress and handles it
     exit(0);
     break;
   case HOME_KEY:
-    E.cx = 0;
+    E.cursor_x = 0;
     break;
   case END_KEY:
-    E.cx = E.screencols - 1;
+    E.cursor_x = E.screencols - 1;
     break;
   case PAGE_UP:
   case PAGE_DOWN:
@@ -330,10 +333,11 @@ void editorProcessKeypress() // to wait for a keypress and handles it
 }
 
 /*** init ***/
+
 void initEditor()
 { // initialize all the fields in the E struct
-  E.cx = 0;
-  E.cy = 0;
+  E.cursor_x = 0;
+  E.cursor_y = 0;
   if (getWindowSize(&E.screenrows, &E.screencols) == -1)
     die("getWindowSize");
 }
