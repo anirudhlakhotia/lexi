@@ -47,8 +47,8 @@ struct editorConfig
 {
   int cursor_x, cursor_y; // cursor x and y
   int rx;
-  int rowoff; //keeps track of what row of the file the user is currently scrolled to
-  int coloff;
+  int rowoff; //for vertical scrolling
+  int coloff; //for horizontal scrolling
   int screenrows;
   int screencols;
   int numrows;
@@ -227,9 +227,10 @@ int editorRowCxToRx(erow *row, int cursor_x) {
     rx++;
   }
   return rx;
-}
+} //converts a chars index into a render index
 
 void editorUpdateRow(erow *row) {
+  //rendering tabs
   int tabs = 0;
   int j;
   for (j = 0; j < row->size; j++)
@@ -250,6 +251,7 @@ void editorUpdateRow(erow *row) {
 }
 
 void editorAppendRow(char *s, size_t len) {
+  //allocates space for a new row
   E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
   int at = E.numrows;
   E.row[at].size = len;
@@ -260,11 +262,12 @@ void editorAppendRow(char *s, size_t len) {
   E.row[at].render = NULL;
   editorUpdateRow(&E.row[at]);
   E.numrows++;
-} //allocates space for a new row
+} 
 
 /*** file i/o ***/
 
 void editorOpen(char *filename) {
+  // allows the user to open a file
   free(E.filename);
   E.filename = strdup(filename);
   FILE *fp = fopen(filename, "r");
@@ -280,7 +283,7 @@ void editorOpen(char *filename) {
   }
   free(line);
   fclose(fp);
-} // allows the user to open a file
+} 
 
 /*** append buffer ***/
 
@@ -311,6 +314,7 @@ void abFree(struct append_buffer *ab)
 /*** output ***/
 
 void editorScroll() {
+  // ensures cursor is inside the visible window
   E.rx = 0;
   if (E.cursor_y < E.numrows) {
     E.rx = editorRowCxToRx(&E.row[E.cursor_y], E.cursor_x);
@@ -330,7 +334,7 @@ void editorScroll() {
 }
 
 void editorDrawRows(struct append_buffer *ab)
-{ // handle drawing each row of text being edited
+{ // handles drawing each row or column of text being edited
   int y;
   for (y = 0; y < E.screenrows; y++)
   { int filerow = y + E.rowoff;
@@ -369,6 +373,7 @@ void editorDrawRows(struct append_buffer *ab)
   }
 }
 
+//creating a status bar to display details about the file
 void editorDrawStatusBar(struct abuf *ab) {
   abAppend(ab, "\x1b[7m", 4);
   char status[80],rstatus[80];
@@ -389,7 +394,7 @@ void editorDrawStatusBar(struct abuf *ab) {
   }
   abAppend(ab, "\x1b[m", 3);
   abAppend(ab, "\r\n", 2);
-}
+} 
 
 void editorDrawMessageBar(struct abuf *ab) {
   abAppend(ab, "\x1b[K", 3);
@@ -416,6 +421,7 @@ void editorRefreshScreen()
   abFree(&ab);
 }
 
+//displaying messages to the user using a status message
 void editorSetStatusMessage(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -462,6 +468,7 @@ void editorMoveCursor(int key)
     }
     break;
   }
+  //snapping cursor to the end of line
   row = (E.cursor_y >= E.numrows) ? NULL : &E.row[E.cursor_y];
   int rowlen = row ? row->size : 0;
   if (E.cursor_x > rowlen) {
@@ -481,7 +488,7 @@ void editorProcessKeypress() // to wait for a keypress and handles it
   case HOME_KEY:
     E.cursor_x = 0;
     break;
-  case END_KEY:
+  case END_KEY: //moves the cursor to the end of the current line
     if (E.cursor_y < E.numrows)
       E.cursor_x = E.row[E.cursor_y].size;
     break;
