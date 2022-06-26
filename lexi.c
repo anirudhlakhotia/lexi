@@ -1,4 +1,4 @@
-/*** includes ***/
+/***  includes  ***/
 
 #include <ctype.h>
 #include <errno.h>
