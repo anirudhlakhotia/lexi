@@ -68,7 +68,7 @@ struct editorConfig E;
 /*** prototypes ***/
 void editorSetStatusMessage(const char *fmt, ...);
 void editorRefreshScreen();
-char *editorPrompt(char *prompt, void (*callback)(char *, int));
+char *editorPrompt(char *prompt, void (*callback)(char *, int)); // takes a callback function as argument 
 /*** terminal ***/
 
 // Terminal starts in canonical mode by default (Input sent only when enter is pressed)
@@ -474,21 +474,21 @@ void editorSave()
   editorSetStatusMessage("Can't save! I/O error: %s", strerror(errno));
 }
 /*** find ***/
-void editorFindCallback(char *query, int key)
+void editorFindCallback(char *query, int key) //callback function for editor prompt
 {
   static int last_match = -1;
   static int direction = 1;
   if (key == '\r' || key == '\x1b')
   {
     last_match = -1;
-    direction = 1;
+    direction = 1; // setting direction to 1 makes user always search in the forward direction
     return;
   }
-  else if (key == ARROW_RIGHT || key == ARROW_DOWN)
+  else if (key == ARROW_RIGHT || key == ARROW_DOWN) // arrow keys will go to the next match
   {
     direction = 1;
   }
-  else if (key == ARROW_LEFT || key == ARROW_UP)
+  else if (key == ARROW_LEFT || key == ARROW_UP) // arrow keys will go to the previous match
   {
     direction = -1;
   }
@@ -512,8 +512,8 @@ void editorFindCallback(char *query, int key)
     char *match = strstr(row->render, query);
     if (match)
     {
-      last_match = current;
-      E.cursor_y = current;
+      last_match = current; // once match is found we set last match to current so if the user presses the arrow keys, we will start the next search from there
+      E.cursor_y = current; // current is index of current row the user is searching
       E.cursor_x = editorRowRxToCx(row, match - row->render);
       E.rowoff = E.numrows;
       break;
@@ -522,9 +522,9 @@ void editorFindCallback(char *query, int key)
 }
 void editorFind()
 {
-  int saved_cx = E.cursor_x;
+  int saved_cx = E.cursor_x; // saves the cursor position incase user clicks escape key
   int saved_cy = E.cursor_y;
-  int saved_coloff = E.coloff;
+  int saved_coloff = E.coloff; // saves the scroll position incase user clicks escape key
   int saved_rowoff = E.rowoff;
   char *query = editorPrompt("Search: %s (Use ESC/Arrows/Enter)", editorFindCallback);
   if (query)
