@@ -39,13 +39,13 @@ enum editorKey
 
 /*** data ***/
 
-typedef struct erow
+typedef struct editor_row
 {
   int size;
   int rsize;
   char *chars;
   char *render;
-} erow; // stores a line of text as a pointer
+} editor_row; // stores a line of text as a pointer
 
 struct editorConfig
 {
@@ -56,7 +56,7 @@ struct editorConfig
   int screenrows;
   int screencols;
   int numrows;
-  erow *row; // pointer to erow
+  editor_row *row; // pointer to editor_row
   int dirty;
   char *filename;
   char statusmsg[80];
@@ -227,7 +227,7 @@ int getWindowSize(int *rows, int *cols)
 
 /*** row operations ***/
 
-int editorRowCxToRx(erow *row, int cursor_x)
+int editorRowCxToRx(editor_row *row, int cursor_x)
 {
   int rx = 0;
   int j;
@@ -240,7 +240,7 @@ int editorRowCxToRx(erow *row, int cursor_x)
   return rx;
 } // converts a chars index into a render index
 
-int editorRowRxToCx(erow *row, int rx)
+int editorRowRxToCx(editor_row *row, int rx)
 {
   int cur_rx = 0;
   int cx;
@@ -255,7 +255,7 @@ int editorRowRxToCx(erow *row, int rx)
   return cx;
 }
 
-void editorUpdateRow(erow *row)
+void editorUpdaterow(editor_row *row)
 {
   // rendering tabs
   int tabs = 0;
@@ -287,45 +287,45 @@ void editorInsertRow(int at, char *s, size_t len)
 {
   if (at < 0 || at > E.numrows)
     return;
-  E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
-  memmove(&E.row[at + 1], &E.row[at], sizeof(erow) * (E.numrows - at));
+  E.row = realloc(E.row, sizeof(editor_row) * (E.numrows + 1));
+  memmove(&E.row[at + 1], &E.row[at], sizeof(editor_row) * (E.numrows - at));
   E.row[at].size = len;
   E.row[at].chars = malloc(len + 1);
   memcpy(E.row[at].chars, s, len);
   E.row[at].chars[len] = '\0';
   E.row[at].rsize = 0;
   E.row[at].render = NULL;
-  editorUpdateRow(&E.row[at]);
+  editorUpdaterow(&E.row[at]);
   E.numrows++;
   E.dirty++;
 }
 
-void editorFreeRow(erow *row)
+void editorFreerow(editor_row *row) // frees the memory allocated to an erow
 {
   free(row->render);
   free(row->chars);
 }
-void editorDelRow(int at)
+void editorDelRow(int at) //
 {
   if (at < 0 || at >= E.numrows)
     return;
-  editorFreeRow(&E.row[at]);
-  memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at - 1));
+  editorFreeditor_row(&E.row[at]);
+  memmove(&E.row[at], &E.row[at + 1], sizeof(editor_row) * (E.numrows - at - 1));
   E.numrows--;
   E.dirty++;
 }
 
-void editorRowDelChar(erow *row, int at)
+void editorRowDelChar(editor_row *row, int at)
 {
   if (at < 0 || at >= row->size)
     return;
   memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
   row->size--;
-  editorUpdateRow(row);
+  editorUpdaterow(row);
   E.dirty++;
 }
 
-void editorRowInsertChar(erow *row, int at, int c)
+void editorRowInsertChar(editor_row *row, int at, int c)
 {
   if (at < 0 || at > row->size)
     at = row->size;
@@ -333,17 +333,17 @@ void editorRowInsertChar(erow *row, int at, int c)
   memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
   row->size++;
   row->chars[at] = c;
-  editorUpdateRow(row);
+  editorUpdaterow(row);
   E.dirty++;
 }
 
-void editorRowAppendString(erow *row, char *s, size_t len)
+void editorRowAppendString(editor_row *row, char *s, size_t len) // append string to the end of a row
 {
   row->chars = realloc(row->chars, row->size + len + 1);
   memcpy(&row->chars[row->size], s, len);
   row->size += len;
   row->chars[row->size] = '\0';
-  editorUpdateRow(row);
+  editorUpdaterow(row);
   E.dirty++;
 }
 
@@ -366,12 +366,12 @@ void editorInsertNewline()
   }
   else
   {
-    erow *row = &E.row[E.cursor_y];
+    editor_row *row = &E.row[E.cursor_y];
     editorInsertRow(E.cursor_y + 1, &row->chars[E.cursor_x], row->size - E.cursor_x);
     row = &E.row[E.cursor_y];
     row->size = E.cursor_x;
     row->chars[row->size] = '\0';
-    editorUpdateRow(row);
+    editorUpdaterow(row);
   }
   E.cursor_y++;
   E.cursor_x = 0;
@@ -383,7 +383,7 @@ void editorDelChar()
     return;
   if (E.cursor_x == 0 && E.cursor_y == 0)
     return;
-  erow *row = &E.row[E.cursor_y];
+  editor_row *row = &E.row[E.cursor_y];
   if (E.cursor_x > 0)
   {
     editorRowDelChar(row, E.cursor_x - 1);
@@ -399,7 +399,7 @@ void editorDelChar()
 }
 /*** file i/o ***/
 
-char *editorRowsToString(int *buflen)
+char *editorRowsToString(int *buflen) // write the erow structures from array to a file by converting them into a single string
 {
   int totlen = 0;
   int j;
@@ -441,7 +441,7 @@ void editorOpen(char *filename)
   E.dirty = 0;
 }
 
-void editorSave()
+void editorSave() // save the file to the disk
 {
   if (E.filename == NULL)
   {
@@ -454,7 +454,7 @@ void editorSave()
   }
   int len;
   char *buf = editorRowsToString(&len);
-  int fd = open(E.filename, O_RDWR | O_CREAT, 0644);
+  int fd = open(E.filename, O_RDWR | O_CREAT, 0644); // O_CREAT : Create if it doesn't exist, O_RDWR : Read and write
   if (fd != -1)
   {
     if (ftruncate(fd, len) != -1)
@@ -508,7 +508,7 @@ void editorFindCallback(char *query, int key)
       current = E.numrows - 1;
     else if (current == E.numrows)
       current = 0;
-    erow *row = &E.row[current];
+    editor_row *row = &E.row[current];
     char *match = strstr(row->render, query);
     if (match)
     {
@@ -758,7 +758,7 @@ char *editorPrompt(char *prompt, void (*callback)(char *, int))
 
 void editorMoveCursor(int key)
 {
-  erow *row = (E.cursor_y >= E.numrows) ? NULL : &E.row[E.cursor_y];
+  editor_row *row = (E.cursor_y >= E.numrows) ? NULL : &E.row[E.cursor_y];
   switch (key)
   {
   case ARROW_LEFT:
