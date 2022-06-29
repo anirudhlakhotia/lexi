@@ -309,7 +309,7 @@ void editorDelRow(int at) //
 {
   if (at < 0 || at >= E.numrows)
     return;
-  editorFreeditor_row(&E.row[at]);
+  editorFreerow(&E.row[at]);
   memmove(&E.row[at], &E.row[at + 1], sizeof(editor_row) * (E.numrows - at - 1));
   E.numrows--;
   E.dirty++;
